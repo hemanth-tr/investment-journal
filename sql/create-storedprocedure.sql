@@ -14,7 +14,7 @@ BEGIN
 	SELECT EXISTS(SELECT * FROM "user" WHERE "Username" = UserId) INTO IsUserExists;
 
 	IF IsUserExists THEN
-    	RAISE NOTICE 'ALREADY EXISTS';
+    	RAISE EXCEPTION 'ALREADY EXISTS';
 	ELSE
 		INSERT INTO "user"
 		VALUES (gen_random_uuid(), UserId, Fullname, Birthdate, Email, Phone);
@@ -23,36 +23,7 @@ BEGIN
 END
 $$;
 
-CREATE OR REPLACE PROCEDURE CreateTrade (
-	Stockname VARCHAR(20),
-	Entryprice decimal,
-	Username VARCHAR(30)
-)
-LANGUAGE plpgsql AS
-$$
-DECLARE
-	IsTradeExists BOOLEAN;
-	UserId UUID;
-	TradeId UUID;
-BEGIN
-	SELECT EXISTS(SELECT * FROM Trade WHERE "stock" = Stockname AND Exitdatetime = null) INTO IsTradeExists;
-
-	IF IsTradeExists THEN
-    	RAISE NOTICE 'ALREADY EXISTS';
-	ELSE
-		TradeId = gen_random_uuid();
-		INSERT INTO Trade
-		VALUES (TradeId, Stockname, Entryprice, null, CURRENT_TIMESTAMP, NULL);
-
-		SELECT UserId = Id FROM "user" WHERE "Username" = Username;
-		INSERT INTO Trades
-		VALUES (TradeId, UserId);
-		RAISE NOTICE 'CREATED';
-	END IF;
-END
-$$;
-
-CREATE OR REPLACE PROCEDURE public.createtrade(
+CREATE OR REPLACE PROCEDURE CreateTrade(
 	IN stockname character varying,
 	IN ep numeric,
 	IN username character varying)
@@ -85,12 +56,30 @@ BEGIN
 
 		ELSE
 
-			RAISE NOTICE 'TRADE EXIST'
+			RAISE EXCEPTION 'TRADE EXIST'
 			
 		END IF;
 		
 	ELSE
-		RAISE NOTICE 'USER DOENST EXIST';
+		RAISE EXCEPTION 'USER DOENST EXIST';
 	END IF;
 END
 $$;
+
+CREATE OR REPLACE FUNCTION GetTrades(
+	Uname VARCHAR(30)
+)
+RETURNS TABLE ("Id" UUID, Stock VARCHAR, Entryprice DECIMAL, Exitprice DECIMAL, Entrydatetime TIMESTAMP, Exitdatetime TIMESTAMP) AS $$
+DECLARE
+	IsUserExists BOOLEAN;
+	UId UUID;
+BEGIN
+	SELECT EXISTS(SELECT * FROM "user" WHERE "Username" = Uname) INTO IsUserExists;
+	IF IsUserExists THEN
+		SELECT Id INTO UId FROM "user" WHERE "Username" = Uname;
+		RAISE NOTICE '%', UId;
+    	RETURN QUERY 
+    	SELECT * FROM TRADE WHERE Id IN (SELECT Id FROM TRADES WHERE UserId = UId);
+	END IF;
+END;
+$$ LANGUAGE plpgsql;
